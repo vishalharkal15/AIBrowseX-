@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;">
+  <title>AIBrowseX - AI-Powered Browser</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Navigation Bar -->
+    <div class="navbar">
+      <div class="nav-controls">
+        <button id="back-btn" class="nav-btn" title="Back">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+        </button>
+        <button id="forward-btn" class="nav-btn" title="Forward">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+        <button id="reload-btn" class="nav-btn" title="Reload">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+        </button>
+        <button id="home-btn" class="nav-btn" title="Home">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="address-bar-container">
+        <input type="text" id="address-bar" placeholder="Enter URL or search..." />
+        <button id="go-btn" class="go-btn">Go</button>
+      </div>
+
+      <div class="nav-actions">
+        <button id="bookmark-btn" class="nav-btn" title="Bookmark this page">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+        <button id="history-btn" class="nav-btn" title="History">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </button>
+        <button id="ai-toggle-btn" class="nav-btn ai-btn" title="Toggle AI Assistant">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+      <!-- Tabs Bar -->
+      <div class="tabs-bar">
+        <div id="tabs-container" class="tabs-container"></div>
+        <button id="new-tab-btn" class="new-tab-btn" title="New Tab">+</button>
+      </div>
+
+      <!-- Browser Area with AI Sidebar -->
+      <div class="browser-container">
+        <!-- Browser View -->
+        <div id="browser-view" class="browser-view">
+          <webview id="webview" src="https://www.google.com" allowpopups></webview>
+        </div>
+
+        <!-- AI Sidebar -->
+        <div id="ai-sidebar" class="ai-sidebar hidden">
+          <div class="sidebar-header">
+            <h3>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+              AI Assistant
+            </h3>
+            <button id="close-sidebar-btn" class="close-btn">✕</button>
+          </div>
+
+          <div class="sidebar-tabs">
+            <button class="sidebar-tab active" data-tab="chat">Chat</button>
+            <button class="sidebar-tab" data-tab="summary">Summary</button>
+            <button class="sidebar-tab" data-tab="analyze">Analyze</button>
+          </div>
+
+          <!-- Chat Tab -->
+          <div id="chat-tab" class="sidebar-content active">
+            <div id="chat-messages" class="chat-messages"></div>
+            <div class="chat-input-container">
+              <textarea id="chat-input" placeholder="Ask about this page..." rows="3"></textarea>
+              <button id="send-chat-btn" class="send-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Summary Tab -->
+          <div id="summary-tab" class="sidebar-content">
+            <button id="generate-summary-btn" class="action-btn">Generate Page Summary</button>
+            <div id="summary-content" class="content-display"></div>
+          </div>
+
+          <!-- Analyze Tab -->
+          <div id="analyze-tab" class="sidebar-content">
+            <select id="analysis-type" class="analysis-select">
+              <option value="general">General Analysis</option>
+              <option value="sentiment">Sentiment Analysis</option>
+              <option value="key_points">Key Points</option>
+              <option value="entities">Entity Extraction</option>
+            </select>
+            <button id="analyze-btn" class="action-btn">Analyze Page</button>
+            <div id="analyze-content" class="content-display"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Bookmarks Modal -->
+    <div id="bookmarks-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Bookmarks</h3>
+          <button class="close-modal-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="bookmarks-list" class="list-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>History</h3>
+          <button class="close-modal-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <input type="text" id="history-search" placeholder="Search history..." class="search-input" />
+          <button id="clear-history-btn" class="danger-btn">Clear All History</button>
+          <div id="history-list" class="list-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+      <div class="spinner"></div>
+      <p>Processing...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
