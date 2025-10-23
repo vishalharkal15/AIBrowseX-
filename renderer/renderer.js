@@ -18,8 +18,6 @@ const elements = {
   forwardBtn: document.getElementById('forward-btn'),
   reloadBtn: document.getElementById('reload-btn'),
   homeBtn: document.getElementById('home-btn'),
-  goBtn: document.getElementById('go-btn'),
-  bookmarkBtn: document.getElementById('bookmark-btn'),
   historyBtn: document.getElementById('history-btn'),
   aiToggleBtn: document.getElementById('ai-toggle-btn'),
   aiSidebar: document.getElementById('ai-sidebar'),
@@ -36,8 +34,20 @@ const elements = {
   analyzeContent: document.getElementById('analyze-content'),
   bookmarksModal: document.getElementById('bookmarks-modal'),
   historyModal: document.getElementById('history-modal'),
+  settingsModal: document.getElementById('settings-modal'),
+  settingsBtn: document.getElementById('settings-btn'),
   loadingOverlay: document.getElementById('loading-overlay'),
-  toastContainer: document.getElementById('toast-container')
+  toastContainer: document.getElementById('toast-container'),
+  // New Chrome-like elements
+  securityIndicator: document.getElementById('security-indicator'),
+  bookmarkStarBtn: document.getElementById('bookmark-star-btn'),
+  shareBtn: document.getElementById('share-btn'),
+  zoomOutBtn: document.getElementById('zoom-out-btn'),
+  zoomInBtn: document.getElementById('zoom-in-btn'),
+  zoomIndicator: document.getElementById('zoom-indicator'),
+  downloadsBtn: document.getElementById('downloads-btn'),
+  extensionsBtn: document.getElementById('extensions-btn'),
+  menuBtn: document.getElementById('menu-btn')
 };
 
 // ============================
@@ -52,11 +62,16 @@ async function init() {
   // Setup event listeners
   setupEventListeners();
   
-  // Initialize first tab
-  createTab('https://www.google.com');
+  // Initialize first tab with custom home page
+  createTab('home.html');
   
   // Load bookmarks and history
   loadBookmarks();
+  
+  // Load initial zoom level
+  const zoomLevel = await window.electronAPI.getSetting('zoom_level') || '100';
+  elements.zoomIndicator.textContent = zoomLevel + '%';
+  applyZoom(parseInt(zoomLevel));
   
   showToast('AIBrowseX initialized', 'success');
 }
@@ -85,29 +100,39 @@ async function checkBackendHealth() {
 // ============================
 function setupEventListeners() {
   // Navigation
-  elements.backBtn.addEventListener('click', () => elements.webview.goBack());
-  elements.forwardBtn.addEventListener('click', () => elements.webview.goForward());
-  elements.reloadBtn.addEventListener('click', () => elements.webview.reload());
-  elements.homeBtn.addEventListener('click', () => navigateTo('https://www.google.com'));
-  elements.goBtn.addEventListener('click', handleNavigation);
-  elements.addressBar.addEventListener('keypress', (e) => {
+  elements.backBtn?.addEventListener('click', () => elements.webview.goBack());
+  elements.forwardBtn?.addEventListener('click', () => elements.webview.goForward());
+  elements.reloadBtn?.addEventListener('click', () => elements.webview.reload());
+  elements.homeBtn?.addEventListener('click', () => navigateTo('home.html'));
+  elements.addressBar?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') handleNavigation();
   });
   
   // Bookmarks & History
-  elements.bookmarkBtn.addEventListener('click', addBookmark);
-  elements.historyBtn.addEventListener('click', showHistoryModal);
+  elements.bookmarkStarBtn?.addEventListener('click', addBookmark);
+  elements.historyBtn?.addEventListener('click', showHistoryModal);
+  
+  // New Chrome-like features
+  elements.shareBtn?.addEventListener('click', shareCurrentPage);
+  elements.zoomOutBtn?.addEventListener('click', () => adjustZoom(-10));
+  elements.zoomInBtn?.addEventListener('click', () => adjustZoom(10));
+  elements.downloadsBtn?.addEventListener('click', showDownloadsModal);
+  elements.extensionsBtn?.addEventListener('click', showExtensionsModal);
+  elements.menuBtn?.addEventListener('click', showMenuDropdown);
+  
+  // Settings
+  elements.settingsBtn?.addEventListener('click', showSettingsModal);
   
   // AI Sidebar
-  elements.aiToggleBtn.addEventListener('click', toggleAISidebar);
-  elements.closeSidebarBtn.addEventListener('click', toggleAISidebar);
+  elements.aiToggleBtn?.addEventListener('click', toggleAISidebar);
+  elements.closeSidebarBtn?.addEventListener('click', toggleAISidebar);
   
   // Tabs
-  elements.newTabBtn.addEventListener('click', () => createTab('https://www.google.com'));
+  elements.newTabBtn?.addEventListener('click', () => createTab('home.html'));
   
   // Chat
-  elements.sendChatBtn.addEventListener('click', sendChatMessage);
-  elements.chatInput.addEventListener('keypress', (e) => {
+  elements.sendChatBtn?.addEventListener('click', sendChatMessage);
+  elements.chatInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendChatMessage();
@@ -115,8 +140,8 @@ function setupEventListeners() {
   });
   
   // Summary & Analysis
-  elements.generateSummaryBtn.addEventListener('click', generateSummary);
-  elements.analyzeBtn.addEventListener('click', analyzeContent);
+  elements.generateSummaryBtn?.addEventListener('click', generateSummary);
+  elements.analyzeBtn?.addEventListener('click', analyzeContent);
   
   // Sidebar tabs
   document.querySelectorAll('.sidebar-tab').forEach(tab => {
@@ -154,12 +179,333 @@ function setupEventListeners() {
   elements.webview.addEventListener('new-window', (e) => {
     createTab(e.url);
   });
+  
+  // Context menu for webview
+  elements.webview.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showContextMenu(e);
+  });
+  
+  // Downloads
+  elements.webview.addEventListener('will-download', (e) => {
+    showToast('Download started', 'info');
+  });
+  
+  // Keyboard shortcuts
+  document.addEventListener('keydown', handleKeyboardShortcuts);
 }
+
+// ============================
+// Keyboard Shortcuts
+// ============================
+function handleKeyboardShortcuts(e) {
+  // Ctrl/Cmd + T: New Tab
+  if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+    e.preventDefault();
+    createTab('home.html');
+  }
+  
+  // Ctrl/Cmd + W: Close Tab
+  if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+    e.preventDefault();
+    if (state.tabs.length > 1) {
+      closeTab(state.activeTabId);
+    }
+  }
+  
+  // Ctrl/Cmd + R: Reload
+  if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+    e.preventDefault();
+    elements.webview.reload();
+  }
+  
+  // Ctrl/Cmd + L: Focus address bar
+  if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+    e.preventDefault();
+    elements.addressBar.select();
+  }
+  
+  // Ctrl/Cmd + D: Bookmark
+  if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+    e.preventDefault();
+    addBookmark();
+  }
+  
+  // Ctrl/Cmd + H: History
+  if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+    e.preventDefault();
+    showHistoryModal();
+  }
+  
+  // Ctrl/Cmd + ,: Settings
+  if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+    e.preventDefault();
+    showSettingsModal();
+  }
+  
+  // F5: Reload
+  if (e.key === 'F5') {
+    e.preventDefault();
+    elements.webview.reload();
+  }
+  
+  // Ctrl/Cmd + +: Zoom In
+  if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+    e.preventDefault();
+    adjustZoom(10);
+  }
+  
+  // Ctrl/Cmd + -: Zoom Out
+  if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+    e.preventDefault();
+    adjustZoom(-10);
+  }
+  
+  // Ctrl/Cmd + 0: Reset Zoom
+  if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+    e.preventDefault();
+    setZoom(100);
+  }
+  
+  // Alt + Left: Back
+  if (e.altKey && e.key === 'ArrowLeft') {
+    e.preventDefault();
+    if (elements.webview.canGoBack()) {
+      elements.webview.goBack();
+    }
+  }
+  
+  // Alt + Right: Forward
+  if (e.altKey && e.key === 'ArrowRight') {
+    e.preventDefault();
+    if (elements.webview.canGoForward()) {
+      elements.webview.goForward();
+    }
+  }
+}
+
+function adjustZoom(delta) {
+  const currentZoom = parseInt(document.getElementById('zoom-level')?.value) || 100;
+  const newZoom = Math.min(200, Math.max(50, currentZoom + delta));
+  setZoom(newZoom);
+}
+
+function setZoom(level) {
+  if (document.getElementById('zoom-level')) {
+    document.getElementById('zoom-level').value = level;
+    document.getElementById('zoom-value').textContent = level + '%';
+  }
+  elements.zoomIndicator.textContent = level + '%';
+  applyZoom(level);
+  window.electronAPI.setSetting({ key: 'zoom_level', value: level.toString() });
+}
+
+// ============================
+// Share Page
+// ============================
+async function shareCurrentPage() {
+  const title = elements.webview.getTitle() || 'Untitled';
+  const url = state.currentUrl;
+  
+  if (!url || url === 'about:blank' || url.startsWith('file://')) {
+    showToast('Cannot share this page', 'error');
+    return;
+  }
+  
+  try {
+    await copyToClipboard(url);
+    showToast('URL copied to clipboard', 'success');
+  } catch (err) {
+    showToast('Failed to copy URL', 'error');
+  }
+}
+
+// ============================
+// Downloads Modal
+// ============================
+function showDownloadsModal() {
+  showToast('Downloads feature - Coming soon!', 'info');
+  // TODO: Implement downloads tracking
+}
+
+// ============================
+// Extensions Modal
+// ============================
+function showExtensionsModal() {
+  showToast('Extensions feature - Coming soon!', 'info');
+  // TODO: Implement extensions support
+}
+
+// ============================
+// Menu Dropdown
+// ============================
+function showMenuDropdown() {
+  // Create menu dropdown
+  const existingMenu = document.getElementById('menu-dropdown');
+  if (existingMenu) {
+    existingMenu.remove();
+    return;
+  }
+  
+  const menu = document.createElement('div');
+  menu.id = 'menu-dropdown';
+  menu.className = 'menu-dropdown';
+  menu.innerHTML = `
+    <div class="menu-item" data-action="new-tab">
+      <span class="menu-icon">📑</span>
+      <span>New Tab</span>
+      <span class="menu-shortcut">Ctrl+T</span>
+    </div>
+    <div class="menu-item" data-action="new-window">
+      <span class="menu-icon">🪟</span>
+      <span>New Window</span>
+      <span class="menu-shortcut">Ctrl+N</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" data-action="bookmarks">
+      <span class="menu-icon">⭐</span>
+      <span>Bookmarks</span>
+      <span class="menu-shortcut">Ctrl+Shift+B</span>
+    </div>
+    <div class="menu-item" data-action="history">
+      <span class="menu-icon">🕐</span>
+      <span>History</span>
+      <span class="menu-shortcut">Ctrl+H</span>
+    </div>
+    <div class="menu-item" data-action="downloads">
+      <span class="menu-icon">⬇️</span>
+      <span>Downloads</span>
+      <span class="menu-shortcut">Ctrl+J</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" data-action="print">
+      <span class="menu-icon">🖨️</span>
+      <span>Print</span>
+      <span class="menu-shortcut">Ctrl+P</span>
+    </div>
+    <div class="menu-item" data-action="find">
+      <span class="menu-icon">🔍</span>
+      <span>Find</span>
+      <span class="menu-shortcut">Ctrl+F</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" data-action="zoom-in">
+      <span class="menu-icon">🔍+</span>
+      <span>Zoom In</span>
+      <span class="menu-shortcut">Ctrl++</span>
+    </div>
+    <div class="menu-item" data-action="zoom-out">
+      <span class="menu-icon">🔍-</span>
+      <span>Zoom Out</span>
+      <span class="menu-shortcut">Ctrl+-</span>
+    </div>
+    <div class="menu-item" data-action="zoom-reset">
+      <span class="menu-icon">🔍↺</span>
+      <span>Reset Zoom</span>
+      <span class="menu-shortcut">Ctrl+0</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" data-action="settings">
+      <span class="menu-icon">⚙️</span>
+      <span>Settings</span>
+      <span class="menu-shortcut">Ctrl+,</span>
+    </div>
+    <div class="menu-item" data-action="help">
+      <span class="menu-icon">❓</span>
+      <span>Help</span>
+      <span class="menu-shortcut">F1</span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" data-action="exit">
+      <span class="menu-icon">🚪</span>
+      <span>Exit</span>
+      <span class="menu-shortcut">Alt+F4</span>
+    </div>
+  `;
+  
+  // Position menu
+  const menuBtn = elements.menuBtn;
+  const rect = menuBtn.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = rect.bottom + 5 + 'px';
+  menu.style.right = '10px';
+  
+  document.body.appendChild(menu);
+  
+  // Handle menu item clicks
+  menu.querySelectorAll('.menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      handleMenuAction(action);
+      menu.remove();
+    });
+  });
+  
+  // Close menu when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', function closeMenu(e) {
+      if (!menu.contains(e.target) && e.target !== menuBtn) {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+      }
+    });
+  }, 0);
+}
+
+function handleMenuAction(action) {
+  switch(action) {
+    case 'new-tab':
+      createTab('home.html');
+      break;
+    case 'new-window':
+      showToast('New Window - Feature coming soon', 'info');
+      break;
+    case 'bookmarks':
+      showBookmarksModal();
+      break;
+    case 'history':
+      showHistoryModal();
+      break;
+    case 'downloads':
+      showDownloadsModal();
+      break;
+    case 'print':
+      elements.webview.print();
+      break;
+    case 'find':
+      showToast('Find in Page - Press Ctrl+F', 'info');
+      break;
+    case 'zoom-in':
+      adjustZoom(10);
+      break;
+    case 'zoom-out':
+      adjustZoom(-10);
+      break;
+    case 'zoom-reset':
+      setZoom(100);
+      break;
+    case 'settings':
+      showSettingsModal();
+      break;
+    case 'help':
+      showToast('Help: Check FEATURES.md for all shortcuts', 'info');
+      break;
+    case 'exit':
+      if (confirm('Are you sure you want to exit AIBrowseX?')) {
+        window.close();
+      }
+      break;
+  }
+}
+
+// ============================
+// Context Menu
+// ============================
 
 // ============================
 // Navigation
 // ============================
-function handleNavigation() {
+async function handleNavigation() {
   const input = elements.addressBar.value.trim();
   if (!input) return;
   
@@ -167,8 +513,8 @@ function handleNavigation() {
   
   // Check if it's a URL or search query
   if (!url.includes('.') || url.includes(' ')) {
-    // Search query
-    url = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
+    // Search query - use configured search engine
+    url = await performSearch(url);
   } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
     url = 'https://' + url;
   }
@@ -190,12 +536,50 @@ function updateAddressBar() {
   // Update navigation buttons
   elements.backBtn.disabled = !elements.webview.canGoBack();
   elements.forwardBtn.disabled = !elements.webview.canGoForward();
+  
+  // Update security indicator
+  updateSecurityIndicator(url);
+  
+  // Update bookmark star
+  updateBookmarkStar(url);
+}
+
+// Update security indicator
+function updateSecurityIndicator(url) {
+  const indicator = elements.securityIndicator;
+  
+  if (url.startsWith('https://')) {
+    indicator.classList.add('secure');
+    indicator.classList.remove('insecure');
+    indicator.title = 'Connection is secure';
+  } else if (url.startsWith('http://')) {
+    indicator.classList.add('insecure');
+    indicator.classList.remove('secure');
+    indicator.title = 'Not secure';
+  } else {
+    indicator.classList.remove('secure', 'insecure');
+    indicator.title = 'Local page';
+  }
+}
+
+// Update bookmark star
+async function updateBookmarkStar(url) {
+  const bookmarks = await window.electronAPI.getBookmarks();
+  const isBookmarked = bookmarks.some(b => b.url === url);
+  
+  if (isBookmarked) {
+    elements.bookmarkStarBtn.classList.add('bookmarked');
+    elements.bookmarkStarBtn.title = 'Edit bookmark';
+  } else {
+    elements.bookmarkStarBtn.classList.remove('bookmarked');
+    elements.bookmarkStarBtn.title = 'Bookmark this page';
+  }
 }
 
 // ============================
 // Tab Management
 // ============================
-function createTab(url = 'https://www.google.com') {
+function createTab(url = 'home.html') {
   const tabId = Date.now().toString();
   const tab = {
     id: tabId,
@@ -226,7 +610,7 @@ function closeTab(tabId) {
   state.tabs.splice(index, 1);
   
   if (state.tabs.length === 0) {
-    createTab('https://www.google.com');
+    createTab('home.html');
   } else if (state.activeTabId === tabId) {
     const newIndex = Math.min(index, state.tabs.length - 1);
     switchTab(state.tabs[newIndex].id);
@@ -558,6 +942,190 @@ async function analyzeContent() {
     elements.analyzeBtn.disabled = false;
     showToast('Failed to analyze content', 'error');
   }
+}
+
+// ============================
+// Settings
+// ============================
+async function showSettingsModal() {
+  elements.settingsModal.classList.remove('hidden');
+  
+  // Load current settings
+  await loadSettings();
+  
+  // Setup event listeners
+  setupSettingsListeners();
+}
+
+async function loadSettings() {
+  // Load home URL
+  const homeUrl = await window.electronAPI.getSetting('home_url') || 'home.html';
+  document.getElementById('home-url-input').value = homeUrl;
+  
+  // Load search engine
+  const searchEngine = await window.electronAPI.getSetting('search_engine') || 'google';
+  document.getElementById('search-engine-select').value = searchEngine;
+  
+  // Load theme
+  const theme = await window.electronAPI.getSetting('theme') || 'dark';
+  document.getElementById('theme-select').value = theme;
+  
+  // Load privacy settings
+  const autoClearHistory = await window.electronAPI.getSetting('auto_clear_history') === 'true';
+  document.getElementById('auto-clear-history').checked = autoClearHistory;
+  
+  const doNotTrack = await window.electronAPI.getSetting('do_not_track') === 'true';
+  document.getElementById('do-not-track').checked = doNotTrack;
+  
+  // Load zoom level
+  const zoomLevel = await window.electronAPI.getSetting('zoom_level') || '100';
+  document.getElementById('zoom-level').value = zoomLevel;
+  document.getElementById('zoom-value').textContent = zoomLevel + '%';
+  
+  // Update backend status
+  updateBackendStatus();
+}
+
+function setupSettingsListeners() {
+  // Home URL
+  document.getElementById('save-home-url-btn').onclick = async () => {
+    const url = document.getElementById('home-url-input').value.trim();
+    if (url) {
+      await window.electronAPI.setSetting({ key: 'home_url', value: url });
+      showToast('Home URL saved', 'success');
+      // Update home button to use new URL
+      elements.homeBtn.onclick = () => navigateTo(url);
+    }
+  };
+  
+  // Search Engine
+  document.getElementById('save-search-engine-btn').onclick = async () => {
+    const engine = document.getElementById('search-engine-select').value;
+    await window.electronAPI.setSetting({ key: 'search_engine', value: engine });
+    showToast('Search engine saved', 'success');
+  };
+  
+  // Theme
+  document.getElementById('save-theme-btn').onclick = async () => {
+    const theme = document.getElementById('theme-select').value;
+    await window.electronAPI.setSetting({ key: 'theme', value: theme });
+    applyTheme(theme);
+    showToast('Theme saved', 'success');
+  };
+  
+  // Zoom Level
+  document.getElementById('zoom-level').oninput = (e) => {
+    const value = e.target.value;
+    document.getElementById('zoom-value').textContent = value + '%';
+    applyZoom(value);
+  };
+  
+  document.getElementById('zoom-level').onchange = async (e) => {
+    const value = e.target.value;
+    await window.electronAPI.setSetting({ key: 'zoom_level', value });
+  };
+  
+  // Privacy settings
+  document.getElementById('auto-clear-history').onchange = async (e) => {
+    await window.electronAPI.setSetting({ 
+      key: 'auto_clear_history', 
+      value: e.target.checked.toString() 
+    });
+    showToast('Privacy setting updated', 'success');
+  };
+  
+  document.getElementById('do-not-track').onchange = async (e) => {
+    await window.electronAPI.setSetting({ 
+      key: 'do_not_track', 
+      value: e.target.checked.toString() 
+    });
+    showToast('Privacy setting updated', 'success');
+  };
+  
+  // Backend check
+  document.getElementById('check-backend-btn').onclick = async () => {
+    await checkBackendHealth();
+    updateBackendStatus();
+  };
+}
+
+function updateBackendStatus() {
+  const statusEl = document.getElementById('backend-status');
+  if (state.backendHealthy) {
+    statusEl.textContent = '✓ Connected';
+    statusEl.style.color = '#00ff88';
+  } else {
+    statusEl.textContent = '✗ Disconnected';
+    statusEl.style.color = '#ff4444';
+  }
+}
+
+function applyTheme(theme) {
+  // Theme application logic (placeholder for future implementation)
+  if (theme === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+}
+
+function applyZoom(level) {
+  const zoomFactor = level / 100;
+  elements.webview.setZoomFactor(zoomFactor);
+}
+
+// ============================
+// Context Menu
+// ============================
+function showContextMenu(e) {
+  // Simple context menu implementation
+  const menuItems = [
+    { label: 'Back', action: () => elements.webview.canGoBack() && elements.webview.goBack() },
+    { label: 'Forward', action: () => elements.webview.canGoForward() && elements.webview.goForward() },
+    { label: 'Reload', action: () => elements.webview.reload() },
+    { label: 'separator' },
+    { label: 'View Page Source', action: () => viewPageSource() },
+    { label: 'Inspect Element', action: () => elements.webview.openDevTools() },
+    { label: 'separator' },
+    { label: 'Copy URL', action: () => copyToClipboard(state.currentUrl) },
+    { label: 'Bookmark This Page', action: () => addBookmark() }
+  ];
+  
+  // Note: Full context menu requires electron's Menu API in main process
+  // This is a simplified version for demonstration
+  console.log('Context menu requested at:', e.x, e.y);
+  showToast('Right-click menu (use browser controls)', 'info');
+}
+
+function viewPageSource() {
+  const url = `view-source:${state.currentUrl}`;
+  createTab(url);
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('URL copied to clipboard', 'success');
+  } catch (err) {
+    console.error('Failed to copy:', err);
+    showToast('Failed to copy URL', 'error');
+  }
+}
+
+// ============================
+// Enhanced Search
+// ============================
+async function performSearch(query) {
+  const searchEngine = await window.electronAPI.getSetting('search_engine') || 'google';
+  
+  const searchUrls = {
+    google: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+    bing: `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
+    duckduckgo: `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+    yahoo: `https://search.yahoo.com/search?p=${encodeURIComponent(query)}`
+  };
+  
+  return searchUrls[searchEngine] || searchUrls.google;
 }
 
 // ============================
