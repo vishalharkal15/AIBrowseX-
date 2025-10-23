@@ -1,0 +1,53 @@
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build outputs
+dist/
+build/
+*.exe
+
+# Electron files (not needed on Vercel)
+main.js
+preload.js
+renderer/
+
+# Database files (local only)
+db/
+*.db
+*.db-shm
+*.db-wal
+
+# Backend (we use api/ instead)
+backend/
+
+# Environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation (not needed for deployment)
+*.md
+!README.md
+
+# Scripts
+*.sh
+*.bat
+
+# Cache
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
